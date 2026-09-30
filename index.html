@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lab Aggregator</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: Arial, sans-serif; background: #f4f6fa; margin: 0; padding: 16px; color: #1c2434; }
+  .wrap { max-width: 600px; margin: 0 auto; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: #5b6577; margin: 0 0 16px; font-size: 14px; }
+  form { background: #fff; padding: 14px; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+  label { display: block; font-size: 13px; font-weight: bold; margin: 8px 0 4px; }
+  input { width: 100%; padding: 11px; font-size: 16px; border: 1px solid #c9d1de; border-radius: 8px; }
+  button { width: 100%; margin-top: 14px; padding: 12px; font-size: 16px; font-weight: bold; color: #fff; background: #1a6fe0; border: 0; border-radius: 8px; }
+  .card { background: #fff; border-radius: 12px; padding: 14px; margin-top: 14px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+  .top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .provider { font-size: 13px; color: #5b6577; }
+  .name { font-size: 17px; font-weight: bold; margin: 6px 0; }
+  .badge { font-size: 11px; font-weight: bold; padding: 3px 8px; border-radius: 20px; }
+  .single { background: #e6f0ff; color: #1a56b0; }
+  .package { background: #fff0d9; color: #a15c00; }
+  .nabl { background: #e2f6e9; color: #1b7a3d; margin-left: 6px; }
+  .tags { margin: 6px 0; }
+  .tag { display: inline-block; background: #eef1f6; font-size: 12px; padding: 3px 8px; border-radius: 6px; margin: 0 4px 4px 0; }
+  .mrp { text-decoration: line-through; color: #8a93a3; margin-right: 8px; }
+  .offer { font-size: 20px; font-weight: bold; }
+  .total { margin-top: 6px; font-size: 14px; }
+  .total b { color: #1a6fe0; }
+  .meta { font-size: 12px; color: #5b6577; margin-top: 6px; }
+  .msg { text-align: center; color: #5b6577; margin-top: 20px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Lab Aggregator</h1>
+  <p class="sub">Compare lab test prices near you</p>
+
+  <form id="form">
+    <label for="q">Test Name</label>
+    <input id="q" placeholder="e.g. Lipid Profile" required>
+    <label for="pin">Pincode</label>
+    <input id="pin" placeholder="e.g. 110001" inputmode="numeric" required>
+    <button type="submit">Search</button>
+  </form>
+
+  <div id="results"></div>
+</div>
+
+<script>
+const form = document.getElementById("form");
+const results = document.getElementById("results");
+
+// Escape text so nothing can inject HTML into the page
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const q = document.getElementById("q").value.trim();
+  const pin = document.getElementById("pin").value.trim();
+  results.innerHTML = '<p class="msg">Searching...</p>';
+
+  try {
+    const res = await fetch("/api/search?search_query=" + encodeURIComponent(q) + "&pincode=" + encodeURIComponent(pin));
+    const data = await res.json();
+    if (!res.ok) {
+      results.innerHTML = '<p class="msg">' + esc(data.error || "Something went wrong") + "</p>";
+      return;
+    }
+    if (data.length === 0) {
+      results.innerHTML = '<p class="msg">No results found for this test and pincode.</p>';
+      return;
+    }
+    results.innerHTML = data.map(card).join("");
+  } catch (err) {
+    results.innerHTML = '<p class="msg">Could not reach the server. Please try again.</p>';
+  }
+});
+
+function card(d) {
+  const isPkg = d.item_type === "package";
+  const fee = d.logistics.home_collection_fee;
+  let priceLine;
+  if (!d.logistics.home_collection) {
+    priceLine = "₹" + d.pricing.offer_price + " (No home collection)";
+  } else if (fee > 0) {
+    priceLine = "₹" + d.pricing.offer_price + " + ₹" + fee + " Home Collection";
+  } else {
+    priceLine = "₹" + d.pricing.offer_price + " + Free Home Collection";
+  }
+
+  return `
+    <div class="card">
+      <div class="top">
+        <span class="badge ${isPkg ? "package" : "single"}">${isPkg ? "Package" : "Single Test"}</span>
+        ${d.nabl_accredited ? '<span class="badge nabl">NABL Certified</span>' : ""}
+      </div>
+      <div class="name">${esc(d.item_name)}</div>
+      <div class="provider">${esc(d.provider_name)}</div>
+      ${isPkg ? '<div class="tags">' + d.included_tests.map(t => '<span class="tag">' + esc(t) + "</span>").join("") + "</div>" : ""}
+      <div style="margin-top:8px">
+        <span class="mrp">₹${d.pricing.mrp}</span>
+        <span class="offer">₹${d.pricing.offer_price}</span>
+      </div>
+      <div class="total">${priceLine} = <b>₹${d.total_price}</b></div>
+      <div class="meta">Report in ${d.logistics.report_tat_hours} hours</div>
+    </div>`;
+}
+</script>
+</body>
+</html>
