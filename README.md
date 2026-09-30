@@ -2,7 +2,7 @@
 
 A mini web app to search lab tests and health packages by test name and pincode, and compare prices across providers.
 
-Live demo: PASTE-YOUR-LINK-HERE
+Live demo: https://lab-aggregator.vercel.app/
 
 ## Tech Stack
 Plain HTML/CSS/JS frontend and a Node.js serverless API (Vercel). I chose this because it needs no build step and deploys frontend and backend together.
